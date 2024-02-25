@@ -8,9 +8,25 @@
 // #include <zephyr/dt-bindings/led/led.h>
 
 / {
+	chosen {
+		zephyr,console = &cdc_acm_uart0;
+		// zephyr,shell-uart = &cdc_acm_uart0;
+	};
+	zephyr,user {
+		dac = <&dac0>;
+		dac-channel-id = <0>;
+		dac-resolution = <12>;
+	};
 	aliases {
 		// watchdog0 = &wdt0;
 		led-strip = &ws2812;
+		crsf = &uart1;
+	};
+};
+
+&zephyr_udc0 {
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
 	};
 };
 
@@ -37,12 +53,34 @@
 	};
 };
 
+&i2c0 {
+	status = "okay";
+	dac0: mcp4725@60 {
+		/* 1st MCP4725 */
+		compatible = "microchip,mcp4725";
+		reg = <0x60>;
+		#io-channel-cells = <1>;
+		status = "okay";
+	};	
+};
+
 &pinctrl {
 	ws2812_pio0_default: ws2812_pio0_default {
 		ws2812 {
 			pinmux = <PIO0_P16>;
 		};
 	};
+
+	uart1_default: uart1_default {
+		group1 {
+			pinmux = <UART1_TX_P8>;
+		};
+		group2 {
+			pinmux = <UART1_RX_P9>;
+			input-enable;
+		};
+	};
+
 };
 
 // / {

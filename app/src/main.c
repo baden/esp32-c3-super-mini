@@ -17,7 +17,24 @@ LOG_MODULE_REGISTER(main);
 #include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/drivers/dac.h>
 
+#define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
+#define DAC_NODE DT_PHANDLE(ZEPHYR_USER_NODE, dac)
+#define DAC_CHANNEL_ID DT_PROP(ZEPHYR_USER_NODE, dac_channel_id)
+#define DAC_RESOLUTION DT_PROP(ZEPHYR_USER_NODE, dac_resolution)
+
+static const struct device *const dac_dev = DEVICE_DT_GET(DAC_NODE);
+
+static const struct dac_channel_cfg dac_ch_cfg = {
+	.channel_id  = DAC_CHANNEL_ID,
+	.resolution  = DAC_RESOLUTION,
+	.buffered = true
+};
+
+
+
+// Адресний світлодіод (в подальшому можливо стрічка)
 #define STRIP_NODE		DT_ALIAS(led_strip)
 #define STRIP_NUM_PIXELS	DT_PROP(DT_ALIAS(led_strip), chain_length)
 
@@ -47,6 +64,17 @@ int main(void)
 		return 0;
 	}
 
+	if (!device_is_ready(dac_dev)) {
+		printk("DAC device %s is not ready\n", dac_dev->name);
+		return 0;
+	}
+	int ret = dac_channel_setup(dac_dev, &dac_ch_cfg);
+	if (ret != 0) {
+		printk("Setting up of DAC channel failed with code %d\n", ret);
+		return 0;
+	}
+	unsigned int dac_value = 0;
+
 	LOG_INF("Displaying pattern on strip");
 	while (1) {
 		memset(&pixels, 0x00, sizeof(pixels));
@@ -65,6 +93,16 @@ int main(void)
 				color = 0;
 			}
 		}
+
+		/* Number of valid DAC values, e.g. 4096 for 12-bit DAC */
+		const int dac_values = 1U << DAC_RESOLUTION;
+
+		ret = dac_write_value(dac_dev, DAC_CHANNEL_ID, dac_value);
+		if (ret != 0) {
+			printk("dac_write_value() failed with code %d\n", ret);
+			return 0;
+		}
+		dac_value = (dac_value + 1) % dac_values;
 
 		k_sleep(DELAY_TIME);
 	}

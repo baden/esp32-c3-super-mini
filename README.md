@@ -30,3 +30,20 @@ west update
 pip install -r ../zephyr/scripts/requirements.txt
 ```
 
+## Опис підключення
+
+https://evo.net.ua/waveshare-rp2040-zero-development-board-20187/?gad_source=1&gclid=Cj0KCQiA5-uuBhDzARIsAAa21T97qgjEY4JwgWkLLuh9oGOced7Py77p4wcL7k6ulejtFxWxFpEWVdYaAgHmEALw_wcB
+
+https://evo.net.ua/content/uploads/images/rp2040-zero-details-7.jpg
+
+Debug UART0, 115200
+GP0 <- TX, GP1 <- RX
+
+CLRS RX UART1, 420kbod
+
+
+DAC1, DAC2 (I2C0)
+GP4 <- SDA, SCL <- GP5
+
+DAC3, DAC4 (I2C1)
+GP6 <- SDA, GP7 <- SCL
