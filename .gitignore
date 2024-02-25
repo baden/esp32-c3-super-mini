@@ -2,7 +2,6 @@
 build
 build*
 /.west
-zephyr
 modules
 bootloader
 .DS_Store

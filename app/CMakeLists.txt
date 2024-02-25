@@ -5,7 +5,10 @@ set(BOARD rpi_pico)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(app LANGUAGES C)
 
-target_sources(app PRIVATE src/main.c)
+# target_sources(app PRIVATE src/main.c)
+
+FILE(GLOB app_sources src/*.c)
+target_sources(app PRIVATE ${app_sources})
 
 # add_subdirectory(src)
 # include_directories(include)
