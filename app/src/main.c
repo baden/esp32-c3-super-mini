@@ -57,15 +57,27 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
 
 #if defined(CONFIG_DAC)
-#define DAC_NODE DT_PHANDLE(ZEPHYR_USER_NODE, dac)
-#define DAC_CHANNEL_ID DT_PROP(ZEPHYR_USER_NODE, dac_channel_id)
-#define DAC_RESOLUTION DT_PROP(ZEPHYR_USER_NODE, dac_resolution)
 
-static const struct device *const dac_dev = DEVICE_DT_GET(DAC_NODE);
+#define DAC0_NODE DT_PHANDLE(ZEPHYR_USER_NODE, dac0)
+#define DAC0_CHANNEL_ID DT_PROP(ZEPHYR_USER_NODE, dac0_channel_id)
+#define DAC0_RESOLUTION DT_PROP(ZEPHYR_USER_NODE, dac0_resolution)
 
-static const struct dac_channel_cfg dac_ch_cfg = {
-	.channel_id  = DAC_CHANNEL_ID,
-	.resolution  = DAC_RESOLUTION,
+#define DAC1_NODE DT_PHANDLE(ZEPHYR_USER_NODE, dac1)
+#define DAC1_CHANNEL_ID DT_PROP(ZEPHYR_USER_NODE, dac1_channel_id)
+#define DAC1_RESOLUTION DT_PROP(ZEPHYR_USER_NODE, dac1_resolution)
+
+static const struct device *const dac0_dev = DEVICE_DT_GET(DAC0_NODE);
+static const struct device *const dac1_dev = DEVICE_DT_GET(DAC1_NODE);
+
+static const struct dac_channel_cfg dac0_ch_cfg = {
+	.channel_id  = DAC0_CHANNEL_ID,
+	.resolution  = DAC0_RESOLUTION,
+	.buffered = true
+};
+
+static const struct dac_channel_cfg dac1_ch_cfg = {
+	.channel_id  = DAC1_CHANNEL_ID,
+	.resolution  = DAC1_RESOLUTION,
 	.buffered = true
 };
 #endif
@@ -320,7 +332,6 @@ int main(void)
 		return 0;
 	}
 	uart_irq_rx_enable(crsf_dev);
-	#endif
 
 	/* indefinitely wait for input from the user */
 	// while (k_msgq_get(&uart_msgq, &tx_buf, K_FOREVER) == 0) {
@@ -335,6 +346,7 @@ int main(void)
 		}
 		k_sleep(K_MSEC(100));
 	}
+	#endif
 
 	// for(;;) {
 	// 	printk("Hello World! %s\n", CONFIG_ARCH);
@@ -344,16 +356,27 @@ int main(void)
 
 	#if defined(CONFIG_DAC)
 
-	if (!device_is_ready(dac_dev)) {
-		printk("DAC device %s is not ready\n", dac_dev->name);
+	if (!device_is_ready(dac0_dev)) {
+		printk("DAC0 device %s is not ready\n", dac0_dev->name);
 		return 0;
 	}
-	ret = dac_channel_setup(dac_dev, &dac_ch_cfg);
+	ret = dac_channel_setup(dac0_dev, &dac0_ch_cfg);
 	if (ret != 0) {
-		printk("Setting up of DAC channel failed with code %d\n", ret);
+		printk("Setting up of DAC0 channel failed with code %d\n", ret);
 		return 0;
 	}
-	unsigned int dac_value = 0;
+	unsigned int dac0_value = 0;
+
+	if (!device_is_ready(dac1_dev)) {
+		printk("DAC1 device %s is not ready\n", dac1_dev->name);
+		return 0;
+	}
+	ret = dac_channel_setup(dac1_dev, &dac1_ch_cfg);
+	if (ret != 0) {
+		printk("Setting up of DAC1 channel failed with code %d\n", ret);
+		return 0;
+	}
+	unsigned int dac1_value = 0;
 	#endif
 
 	LOG_INF("Displaying pattern on strip");
@@ -377,14 +400,23 @@ int main(void)
 
 		#if defined(CONFIG_DAC)
 		/* Number of valid DAC values, e.g. 4096 for 12-bit DAC */
-		const int dac_values = 1U << DAC_RESOLUTION;
+		const int dac0_values = 1U << DAC0_RESOLUTION;
+		const int dac1_values = 1U << DAC1_RESOLUTION;
 
-		ret = dac_write_value(dac_dev, DAC_CHANNEL_ID, dac_value);
+		ret = dac_write_value(dac0_dev, DAC0_CHANNEL_ID, dac0_value);
 		if (ret != 0) {
-			printk("dac_write_value() failed with code %d\n", ret);
+			printk("dac0_write_value() failed with code %d\n", ret);
 			return 0;
 		}
-		dac_value = (dac_value + 1) % dac_values;
+		dac0_value = (dac0_value + 1) % dac0_values;
+
+		ret = dac_write_value(dac1_dev, DAC1_CHANNEL_ID, dac1_value);
+		if (ret != 0) {
+			printk("dac1_write_value() failed with code %d\n", ret);
+			return 0;
+		}
+		dac1_value = (dac1_value + 1) % dac1_values;
+
 		#endif
 
 		k_sleep(DELAY_TIME);
