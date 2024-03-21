@@ -8,10 +8,11 @@
 // #include <zephyr/dt-bindings/led/led.h>
 
 / {
-	// chosen {
+	chosen {
 	// 	zephyr,console = &cdc_acm_uart0;
 	// 	// zephyr,shell-uart = &cdc_acm_uart0;
-	// };
+		crsf = &uart1;
+	};
 	zephyr,user {
 		dac = <&dac0>;
 		dac-channel-id = <0>;
@@ -20,7 +21,7 @@
 	aliases {
 		// watchdog0 = &wdt0;
 		led-strip = &ws2812;
-		crsf = &uart1;
+		// crsf = &uart1;
 	};
 };
 
@@ -62,6 +63,13 @@
 		#io-channel-cells = <1>;
 		status = "okay";
 	};	
+};
+
+&uart1 {
+	status = "okay";
+	pinctrl-0 = <&uart1_default>;
+	pinctrl-names = "default";
+	current-speed = <420000>;
 };
 
 &pinctrl {

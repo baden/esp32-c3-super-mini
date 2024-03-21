@@ -40,10 +40,33 @@ Debug UART0, 115200
 GP0 <- TX, GP1 <- RX
 
 CLRS RX UART1, 420kbod
-
+GP8 <- TX, GP9 <- RX
 
 DAC1, DAC2 (I2C0)
 GP4 <- SDA, SCL <- GP5
 
 DAC3, DAC4 (I2C1)
 GP6 <- SDA, GP7 <- SCL
+
+
+
+
+## Всілякі посилання
+
+CRSF з проекту AM32-ESC
+
+https://github.com/AlkaMotors/AM32-MultiRotor-ESC-firmware/blob/master/Src/crsf.c
+
+Процесор та драйвер ключів в одному корпусі:
+
+https://www.digikey.com/en/products/detail/STSPIN32F0/497-16978-ND/6236758?curr=usd&utm_campaign=buynow&utm_medium=aggregator&utm_source=octopart
+
+### Запишу сюди посилання по AI:
+
+RISC-V Milk-V Duo
+
+https://www.aliexpress.com/item/1005005979520624.html?gad_source=1&dp=f5fcb5172f6273b1e696f7646bdfa329&af=984299&cv=47843&afref=https%3A%2F%2Fwww.google.com%2F&mall_affr=pr3&utm_source=admitad&utm_medium=cpa&utm_campaign=984299&utm_content=47843&dp=f5fcb5172f6273b1e696f7646bdfa329&af=984299&cv=47843&afref=https%3A%2F%2Fwww.google.com%2F&mall_affr=pr3&utm_source=admitad&utm_medium=cpa&utm_campaign=984299&utm_content=47843&aff_fcid=172d7fe336b84905baab88c47f1afbbe-1708992624705-05872-_ePNSNV&aff_fsk=_ePNSNV&aff_platform=portals-tool&sk=_ePNSNV&aff_trace_key=172d7fe336b84905baab88c47f1afbbe-1708992624705-05872-_ePNSNV&terminal_id=77d224a98e3c40d3ae15351f213f4d14&afSmartRedirect=y
+
+https://github.com/milkv-duo/cvitek-tdl-sdk-cv180x/tree/main
+
+І в подальшому RISC-V Milk-V Duo 256 (інший процесор та вдвічі більше (не факт) потужність NPU)
