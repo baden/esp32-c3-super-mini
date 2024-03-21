@@ -14,6 +14,12 @@ config SAMPLE_LED_UPDATE_DELAY
 	help
 	  Delay between LED updates in ms.
 
+config CRSF
+	bool "CRSF"
+	default y
+	help
+	  Enable CRSF protocol support.
+
 endmenu
 
 source "Kconfig.zephyr"

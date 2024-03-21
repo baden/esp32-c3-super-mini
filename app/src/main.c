@@ -10,7 +10,6 @@
 #include <errno.h>
 #include <string.h>
 
-
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -22,7 +21,10 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 #include <zephyr/sys/ring_buffer.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/printk.h>
+
+#if defined(CONFIG_DAC)
 #include <zephyr/drivers/dac.h>
+#endif
 // #include <zephyr/usb/usb_device.h>
 // #include <zephyr/usb/usbd.h>
 // #include <zephyr/drivers/uart.h>
@@ -53,6 +55,8 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 
 
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
+
+#if defined(CONFIG_DAC)
 #define DAC_NODE DT_PHANDLE(ZEPHYR_USER_NODE, dac)
 #define DAC_CHANNEL_ID DT_PROP(ZEPHYR_USER_NODE, dac_channel_id)
 #define DAC_RESOLUTION DT_PROP(ZEPHYR_USER_NODE, dac_resolution)
@@ -64,7 +68,7 @@ static const struct dac_channel_cfg dac_ch_cfg = {
 	.resolution  = DAC_RESOLUTION,
 	.buffered = true
 };
-
+#endif
 
 
 // Адресний світлодіод (в подальшому можливо стрічка)
@@ -85,6 +89,8 @@ struct led_rgb pixels[STRIP_NUM_PIXELS];
 
 static const struct device *const strip = DEVICE_DT_GET(STRIP_NODE);
 
+
+#if defined(CONFIG_CRSF)
 #define DEV_CRFS   DEVICE_DT_GET(DT_CHOSEN(crsf))
 static const struct device *const crsf_dev = DEV_CRFS;
 
@@ -151,6 +157,7 @@ uint8_t crsf_crc8(const uint8_t *ptr, uint8_t len){
 void crsf_parse_payload(uint8_t *payload, uint8_t len) {
 
 	if(len != 0x18) {
+		// LOG_ERR("CRSF Frame Length: %d", len);
 		return;
 	}
 	if (payload[0] != 0x16) {		// Type: RC Channels
@@ -207,27 +214,32 @@ void serial_cb(const struct device *dev, void *user_data)
 	static uint8_t crsf_payload[32];
 
 	if (!uart_irq_update(crsf_dev)) {
+		// printk("1");
 		return;
 	}
 
 	if (!uart_irq_rx_ready(crsf_dev)) {
+		// printk("2");
 		return;
 	}
 
 	/* read until FIFO empty */
 	while (uart_fifo_read(crsf_dev, &c, 1) == 1) {
+		// printk("3");
 		// Wait for the start of a frame
 		switch (crsf_state) {
 		case CRSF_STATE_WAIT_SYNC:
 			if (c == 0xC8) {
 				crsf_state = CRSF_STATE_WAIT_LENGTH;
 				// LOG_ERR("S");
+				// printk("4");
 			}
 			break;
 		case CRSF_STATE_WAIT_LENGTH:
 			len = c;	// Expecting 0x18 only
 			if(len > 32) {
 				crsf_state = CRSF_STATE_WAIT_SYNC;
+				// LOG_ERR("CRSF Frame Length: %d", len);
 				break;
 			}
 			crsf_payload_pos = 0;
@@ -247,6 +259,7 @@ void serial_cb(const struct device *dev, void *user_data)
 	}
 
 }
+#endif
 
 int main(void)
 {
@@ -287,24 +300,27 @@ int main(void)
 	}
 
 
+	#if defined(CONFIG_CRSF)
 	if (!device_is_ready(crsf_dev)) {
-		printk("CRSF UART device not found!");
+		LOG_ERR("CRSF UART device not found!");
 		return 0;
+	} else {
+		LOG_INF("CRSF UART device found!");
 	}
 	/* configure interrupt and callback to receive data */
 	ret = uart_irq_callback_user_data_set(crsf_dev, serial_cb, NULL);
 	if (ret < 0) {
 		if (ret == -ENOTSUP) {
-			printk("Interrupt-driven UART API support not enabled\n");
+			LOG_ERR("Interrupt-driven UART API support not enabled");
 		} else if (ret == -ENOSYS) {
-			printk("UART device does not support interrupt-driven API\n");
+			LOG_ERR("UART device does not support interrupt-driven API");
 		} else {
-			printk("Error setting UART callback: %d\n", ret);
+			LOG_ERR("Error setting UART callback: %d", ret);
 		}
 		return 0;
 	}
 	uart_irq_rx_enable(crsf_dev);
-
+	#endif
 
 	/* indefinitely wait for input from the user */
 	// while (k_msgq_get(&uart_msgq, &tx_buf, K_FOREVER) == 0) {
@@ -312,7 +328,7 @@ int main(void)
 	for(;;) {
 		if(crsf_frame_ready) {
 			crsf_frame_ready = false;
-			LOG_DBG("CH0:%5d CH1:%5d CH2:%5d CH3:%5d CH4:%5d CH5:%5d CH6: %5d CH7:%5d",
+			LOG_INF("CH0:%5d CH1:%5d CH2:%5d CH3:%5d CH4:%5d CH5:%5d CH6: %5d CH7:%5d",
 				channel[0], channel[1], channel[2], channel[3], channel[4], channel[5], channel[6], channel[7]
 			);
 		
@@ -320,10 +336,13 @@ int main(void)
 		k_sleep(K_MSEC(100));
 	}
 
-	for(;;) {
-		printk("Hello World! %s\n", CONFIG_ARCH);
-		k_sleep(K_SECONDS(10));
-	}
+	// for(;;) {
+	// 	printk("Hello World! %s\n", CONFIG_ARCH);
+	// 	k_sleep(K_SECONDS(10));
+	// }
+
+
+	#if defined(CONFIG_DAC)
 
 	if (!device_is_ready(dac_dev)) {
 		printk("DAC device %s is not ready\n", dac_dev->name);
@@ -335,6 +354,7 @@ int main(void)
 		return 0;
 	}
 	unsigned int dac_value = 0;
+	#endif
 
 	LOG_INF("Displaying pattern on strip");
 	while (1) {
@@ -355,6 +375,7 @@ int main(void)
 			}
 		}
 
+		#if defined(CONFIG_DAC)
 		/* Number of valid DAC values, e.g. 4096 for 12-bit DAC */
 		const int dac_values = 1U << DAC_RESOLUTION;
 
@@ -364,6 +385,7 @@ int main(void)
 			return 0;
 		}
 		dac_value = (dac_value + 1) % dac_values;
+		#endif
 
 		k_sleep(DELAY_TIME);
 	}
