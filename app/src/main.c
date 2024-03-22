@@ -336,16 +336,19 @@ int main(void)
 	/* indefinitely wait for input from the user */
 	// while (k_msgq_get(&uart_msgq, &tx_buf, K_FOREVER) == 0) {
 
-	for(;;) {
-		if(crsf_frame_ready) {
-			crsf_frame_ready = false;
-			LOG_INF("CH0:%5d CH1:%5d CH2:%5d CH3:%5d CH4:%5d CH5:%5d CH6: %5d CH7:%5d",
-				channel[0], channel[1], channel[2], channel[3], channel[4], channel[5], channel[6], channel[7]
-			);
+	// for(;;) {
+	// 	if(crsf_frame_ready) {
+	// 		crsf_frame_ready = false;
+	// 		LOG_INF(
+	// 			"0:%5d 1:%5d 2:%5d 3:%5d 4:%5d 5:%5d 6: %5d 7:%5d "
+	// 			"8:%5d 9:%5d 10:%5d 11:%5d 12:%5d 13:%5d 14:%5d 15:%5d",
+	// 			channel[0], channel[1], channel[2], channel[3], channel[4], channel[5], channel[6], channel[7],
+	// 			channel[8], channel[9], channel[10], channel[11], channel[12], channel[13], channel[14], channel[15]
+	// 		);
 		
-		}
-		k_sleep(K_MSEC(100));
-	}
+	// 	}
+	// 	k_sleep(K_MSEC(100));
+	// }
 	#endif
 
 	// for(;;) {
@@ -399,23 +402,72 @@ int main(void)
 		}
 
 		#if defined(CONFIG_DAC)
-		/* Number of valid DAC values, e.g. 4096 for 12-bit DAC */
-		const int dac0_values = 1U << DAC0_RESOLUTION;
-		const int dac1_values = 1U << DAC1_RESOLUTION;
 
-		ret = dac_write_value(dac0_dev, DAC0_CHANNEL_ID, dac0_value);
-		if (ret != 0) {
-			printk("dac0_write_value() failed with code %d\n", ret);
-			return 0;
-		}
-		dac0_value = (dac0_value + 1) % dac0_values;
+		if(crsf_frame_ready) {
+			crsf_frame_ready = false;
+			// LOG_INF(
+			// 	"0:%5d 1:%5d 2:%5d 3:%5d 4:%5d 5:%5d 6: %5d 7:%5d"
+			// 	"8:%5d 9:%5d 10:%5d 11:%5d 12:%5d 13:%5d 14:%5d 15:%5d",
+			// 	channel[0], channel[1], channel[2], channel[3], channel[4], channel[5], channel[6], channel[7],
+			// 	channel[8], channel[9], channel[10], channel[11], channel[12], channel[13], channel[14], channel[15]
+			// );
+			// 
+			int left_stick_x = channel[3];
+			int left_stick_y = channel[2];
+			// int right_stick_x = channel[0];
+			// int right_stick_y = channel[1];
 
-		ret = dac_write_value(dac1_dev, DAC1_CHANNEL_ID, dac1_value);
-		if (ret != 0) {
-			printk("dac1_write_value() failed with code %d\n", ret);
-			return 0;
+			// Translate from 174...1811 to 0...4095
+			left_stick_x = (left_stick_x - 174) * 4095 / (1811 - 174);
+			left_stick_y = (left_stick_y - 174) * 4095 / (1811 - 174);
+
+			dac0_value = left_stick_x;
+			dac1_value = left_stick_y;
+
+			if(dac0_value > 4094) {
+				dac0_value = 4094;
+			} else if(dac0_value < 0) {
+				dac0_value = 0;
+			}
+
+			ret = dac_write_value(dac0_dev, DAC0_CHANNEL_ID, dac0_value);
+			if (ret != 0) {
+				printk("dac0_write_value() failed with code %d\n", ret);
+				return 0;
+			}
+
+			if(dac1_value > 4094) {
+				dac1_value = 4094;
+			} else if(dac1_value < 0) {
+				dac1_value = 0;
+			}
+
+			ret = dac_write_value(dac1_dev, DAC1_CHANNEL_ID, dac1_value);
+			if (ret != 0) {
+				printk("dac1_write_value() failed with code %d\n", ret);
+				return 0;
+			}
+
 		}
-		dac1_value = (dac1_value + 1) % dac1_values;
+
+
+		// /* Number of valid DAC values, e.g. 4096 for 12-bit DAC */
+		// const int dac0_values = 1U << DAC0_RESOLUTION;
+		// const int dac1_values = 1U << DAC1_RESOLUTION;
+
+		// ret = dac_write_value(dac0_dev, DAC0_CHANNEL_ID, dac0_value);
+		// if (ret != 0) {
+		// 	printk("dac0_write_value() failed with code %d\n", ret);
+		// 	return 0;
+		// }
+		// dac0_value = (dac0_value + 1) % dac0_values;
+
+		// ret = dac_write_value(dac1_dev, DAC1_CHANNEL_ID, dac1_value);
+		// if (ret != 0) {
+		// 	printk("dac1_write_value() failed with code %d\n", ret);
+		// 	return 0;
+		// }
+		// dac1_value = (dac1_value + 1) % dac1_values;
 
 		#endif
 
