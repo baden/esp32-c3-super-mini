@@ -273,6 +273,10 @@ void serial_cb(const struct device *dev, void *user_data)
 }
 #endif
 
+#if !defined(abs)
+#define abs(x) ((x) < 0 ? -(x) : (x))
+#endif
+
 int main(void)
 {
 	// const struct device *const dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
@@ -412,23 +416,84 @@ int main(void)
 			// 	channel[8], channel[9], channel[10], channel[11], channel[12], channel[13], channel[14], channel[15]
 			// );
 			// 
-			int left_stick_x = channel[3];
-			int left_stick_y = channel[2];
-			// int right_stick_x = channel[0];
-			// int right_stick_y = channel[1];
+			// int left_stick_x = channel[3];
+			// int left_stick_y = channel[2];
+			int right_stick_x = channel[0];
+			int right_stick_y = channel[1];
 
-			// Translate from 174...1811 to 0...4095
-			left_stick_x = (left_stick_x - 174) * 4095 / (1811 - 174);
-			left_stick_y = (left_stick_y - 174) * 4095 / (1811 - 174);
+			#define CENTER_X 991	// Чомусь мені здається, шо треба 992
+			#define CENTER_Y 991	// Чомусь мені здається, шо треба 992
 
-			dac0_value = left_stick_x;
-			dac1_value = left_stick_y;
+			#define MAX_X 820		// -820...820
+			#define MAX_Y 820		// -820...820
+
+			// Translate from 174...1811 to -820...820 (centered at 991)
+			right_stick_x -= CENTER_X;
+			right_stick_y -= CENTER_Y;
+
+			#define DEADZONE 10
+			bool in_deadzone = false;
+			if(right_stick_x > -DEADZONE && right_stick_x < DEADZONE) {
+				right_stick_x = 0;
+				in_deadzone = true;
+			}
+			if(right_stick_y > -DEADZONE && right_stick_y < DEADZONE) {
+				right_stick_y = 0;
+				in_deadzone = true;
+			}
+
+			if(in_deadzone) {
+
+			}
+
+			#if 0
+			#define MULTIPLIER 16
+
+			// Multiply by MULTIPLIER for better resolution
+			right_stick_x *= MULTIPLIER;
+			right_stick_y *= MULTIPLIER;
+
+			// Rotate right_stick_x, right_stick_y 45 degrees counterclockwise
+			int temp = right_stick_x;
+			right_stick_x = (int)(0.70710678118 * right_stick_x - 0.70710678118 * right_stick_y);
+			right_stick_y = (int)(0.70710678118 * right_stick_y + 0.70710678118 * temp);
+
+			// int left_wheel = right_stick_y + right_stick_x;
+			// int right_wheel = right_stick_y - right_stick_x;
+
+			int left_wheel = abs(right_stick_y);
+			int right_wheel = abs(right_stick_x);
+			bool left_wheel_dir = right_stick_y > 0;
+			bool right_wheel_dir = right_stick_x > 0;
+			#endif
+
+			// Проста поведінка - прцює тільки частина діапазону
+			#define MULTIPLIER 1
+			int left_wheel = right_stick_x + right_stick_y;
+			int right_wheel = right_stick_y - right_stick_x;
+			bool left_wheel_dir = left_wheel > 0;
+			bool right_wheel_dir = right_wheel > 0;
+			left_wheel = abs(left_wheel);
+			right_wheel = abs(right_wheel);
+
+			LOG_INF(
+				"L: %s:%d "
+				"R: %s:%d",
+				left_wheel_dir ? "^" : "v", left_wheel,
+				right_wheel_dir ? "^" : "v", right_wheel
+			);
+
+			dac0_value = left_wheel * 4094 / MAX_X / MULTIPLIER;
+			dac1_value = right_wheel * 4094 / MAX_Y / MULTIPLIER;
 
 			if(dac0_value > 4094) {
 				dac0_value = 4094;
 			} else if(dac0_value < 0) {
 				dac0_value = 0;
 			}
+
+			// Invert voltage
+			dac0_value = 4094 - dac0_value;
 
 			ret = dac_write_value(dac0_dev, DAC0_CHANNEL_ID, dac0_value);
 			if (ret != 0) {
@@ -441,6 +506,9 @@ int main(void)
 			} else if(dac1_value < 0) {
 				dac1_value = 0;
 			}
+
+			// Invert voltage
+			dac1_value = 4094 - dac1_value;
 
 			ret = dac_write_value(dac1_dev, DAC1_CHANNEL_ID, dac1_value);
 			if (ret != 0) {

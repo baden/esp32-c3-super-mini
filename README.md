@@ -39,7 +39,7 @@ https://evo.net.ua/content/uploads/images/rp2040-zero-details-7.jpg
 Debug UART0, 115200
 GP0 <- TX, GP1 <- RX
 
-CLRS RX UART1, 420kbod
+CLRS RX UART1, 420kbod  (пробую переналаштувати на 19200 шоб надійно працювало на довгому дроті)
 GP8 <- TX, GP9 <- RX
 
 DAC1, DAC2 (I2C0)
@@ -48,6 +48,10 @@ GP4 <- SDA, GP5 <- SCL
 DAC3, DAC4 (I2C1)
 GP6 <- SDA, GP7 <- SCL
 
+
+# Керування напрямками.
+
+GP10, GP11, GP12, GP13 <- напрямки по 4х колесах
 
 
 

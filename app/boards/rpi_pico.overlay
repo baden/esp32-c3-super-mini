@@ -28,7 +28,15 @@
 		// watchdog0 = &wdt0;
 		led-strip = &ws2812;
 		// crsf = &uart1;
+
 	};
+	// leds {
+	// 	compatible = "gpio-leds";
+	// 	led_dir_0: led_dir_0 {
+	// 		gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>;
+	// 		default-state = "off";
+	// 	};
+	// };
 };
 
 // &zephyr_udc0 {
@@ -84,7 +92,8 @@
 	status = "okay";
 	pinctrl-0 = <&uart1_default>;
 	pinctrl-names = "default";
-	current-speed = <420000>;
+	// current-speed = <420000>;
+	current-speed = <19200>;
 };
 
 
