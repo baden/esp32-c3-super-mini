@@ -18,6 +18,7 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 #include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/drivers/uart.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/ring_buffer.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/printk.h>
@@ -25,6 +26,16 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 #if defined(CONFIG_DAC)
 #include <zephyr/drivers/dac.h>
 #endif
+
+// const struct gpio_dt_spec lff = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(directions), foo_gpios, 0);
+
+// #define DIR_SPEC(n) GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(directions), foo_gpios, n)
+
+// const struct gpio_dt_spec lff = DIR_SPEC(0);	// Left front forward
+// const struct gpio_dt_spec lfr = DIR_SPEC(1);	// Left front reverse
+// const struct gpio_dt_spec rff = DIR_SPEC(2);	// Right front forward
+// const struct gpio_dt_spec rfr = DIR_SPEC(3);	// Right front reverse
+
 // #include <zephyr/usb/usb_device.h>
 // #include <zephyr/usb/usbd.h>
 // #include <zephyr/drivers/uart.h>
@@ -55,6 +66,11 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 
 
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
+
+const struct gpio_dt_spec lf_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, lf_gpios);	// Left forward
+const struct gpio_dt_spec lr_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, lr_gpios);	// Left reverse
+const struct gpio_dt_spec rf_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, rf_gpios);	// Right forward
+const struct gpio_dt_spec rr_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, rr_gpios);	// Right reverse
 
 #if defined(CONFIG_DAC)
 
@@ -308,6 +324,50 @@ int main(void)
 	int rc;
 	int ret;
 
+	// Шо за куйня? Нафіга тут таке?
+
+	if(!gpio_is_ready_dt(&lf_gpio)) {
+		LOG_ERR("Left forward GPIO device not found!");
+		return 0;
+	}
+	ret = gpio_pin_configure_dt(&lf_gpio, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		LOG_ERR("Failed to configure left forward GPIO: %d", ret);
+		return 0;
+	}
+
+	if(!gpio_is_ready_dt(&lr_gpio)) {
+		LOG_ERR("Left reverse GPIO device not found!");
+		return 0;
+	}
+	ret = gpio_pin_configure_dt(&lr_gpio, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		LOG_ERR("Failed to configure left reverse GPIO: %d", ret);
+		return 0;
+	}
+
+	if(!gpio_is_ready_dt(&rf_gpio)) {
+		LOG_ERR("Right forward GPIO device not found!");
+		return 0;
+	}
+	ret = gpio_pin_configure_dt(&rf_gpio, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		LOG_ERR("Failed to configure right forward GPIO: %d", ret);
+		return 0;
+	}
+
+	if(!gpio_is_ready_dt(&rr_gpio)) {
+		LOG_ERR("Right reverse GPIO device not found!");
+		return 0;
+	}
+	ret = gpio_pin_configure_dt(&rr_gpio, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		LOG_ERR("Failed to configure right reverse GPIO: %d", ret);
+		return 0;
+	}
+
+
+
 	if (device_is_ready(strip)) {
 		LOG_INF("Found LED strip device %s", strip->name);
 	} else {
@@ -442,9 +502,6 @@ int main(void)
 				in_deadzone = true;
 			}
 
-			if(in_deadzone) {
-
-			}
 
 			#if 0
 			#define MULTIPLIER 16
@@ -476,12 +533,30 @@ int main(void)
 			left_wheel = abs(left_wheel);
 			right_wheel = abs(right_wheel);
 
-			LOG_INF(
-				"L: %s:%d "
-				"R: %s:%d",
-				left_wheel_dir ? "^" : "v", left_wheel,
-				right_wheel_dir ? "^" : "v", right_wheel
-			);
+			if(in_deadzone) {
+				right_stick_x = 0;
+				right_stick_y = 0;
+				// Off all directions
+				gpio_pin_set_dt(&lf_gpio, 0);
+				gpio_pin_set_dt(&lr_gpio, 0);
+				gpio_pin_set_dt(&rf_gpio, 0);
+				gpio_pin_set_dt(&rr_gpio, 0);
+			} else {
+				if(left_wheel_dir) {
+					gpio_pin_set_dt(&lr_gpio, 0);
+					gpio_pin_set_dt(&lf_gpio, 1);
+				} else {
+					gpio_pin_set_dt(&lf_gpio, 0);
+					gpio_pin_set_dt(&lr_gpio, 1);
+				}
+				if(right_wheel_dir) {
+					gpio_pin_set_dt(&rr_gpio, 0);
+					gpio_pin_set_dt(&rf_gpio, 1);
+				} else {
+					gpio_pin_set_dt(&rf_gpio, 0);
+					gpio_pin_set_dt(&rr_gpio, 1);
+				}
+			}
 
 			dac0_value = left_wheel * 4094 / MAX_X / MULTIPLIER;
 			dac1_value = right_wheel * 4094 / MAX_Y / MULTIPLIER;
@@ -495,12 +570,6 @@ int main(void)
 			// Invert voltage
 			dac0_value = 4094 - dac0_value;
 
-			ret = dac_write_value(dac0_dev, DAC0_CHANNEL_ID, dac0_value);
-			if (ret != 0) {
-				printk("dac0_write_value() failed with code %d\n", ret);
-				return 0;
-			}
-
 			if(dac1_value > 4094) {
 				dac1_value = 4094;
 			} else if(dac1_value < 0) {
@@ -509,6 +578,24 @@ int main(void)
 
 			// Invert voltage
 			dac1_value = 4094 - dac1_value;
+
+			LOG_INF(
+				"L: %s:%d "
+				"R: %s:%d "
+				"DAC0: %d "
+				"DAC1: %d",
+				left_wheel_dir ? "^" : "v", left_wheel,
+				right_wheel_dir ? "^" : "v", right_wheel,
+				dac0_value,
+				dac1_value
+			);
+
+			ret = dac_write_value(dac0_dev, DAC0_CHANNEL_ID, dac0_value);
+			if (ret != 0) {
+				printk("dac0_write_value() failed with code %d\n", ret);
+				return 0;
+			}
+
 
 			ret = dac_write_value(dac1_dev, DAC1_CHANNEL_ID, dac1_value);
 			if (ret != 0) {

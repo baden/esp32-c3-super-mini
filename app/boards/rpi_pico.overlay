@@ -23,12 +23,16 @@
 		dac1-channel-id = <0>;
 		dac1-resolution = <12>;
 
+		lf-gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>; // Left Forward
+		lr-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>; // Left Reverse
+		rf-gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>; // Right Forward
+		rr-gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>; // Right Reverse
+
 	};
 	aliases {
 		// watchdog0 = &wdt0;
 		led-strip = &ws2812;
 		// crsf = &uart1;
-
 	};
 	// leds {
 	// 	compatible = "gpio-leds";
@@ -37,6 +41,26 @@
 	// 		default-state = "off";
 	// 	};
 	// };
+	// outputs {
+	// 	directions: node {		
+	// 		foo-gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>, // Left Front Forward
+	// 					<&gpio0 11 GPIO_ACTIVE_HIGH>, // Left Front Reverse
+	// 					<&gpio0 12 GPIO_ACTIVE_HIGH>, // Right Front Forward
+	// 					<&gpio0 13 GPIO_ACTIVE_HIGH>; // Right Front Reverse
+	// 	};
+	// };
+
+	// n: node {
+	// 	foo-gpios = <&gpio0 1 GPIO_ACTIVE_LOW>,
+	// 				<&gpio0 2 GPIO_ACTIVE_LOW>;
+	// };
+	
+};
+
+
+
+&gpio0 {
+	status = "okay";
 };
 
 // &zephyr_udc0 {
