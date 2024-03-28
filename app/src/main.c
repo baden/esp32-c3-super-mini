@@ -493,15 +493,11 @@ int main(void)
 
 			#define DEADZONE 10
 			bool in_deadzone = false;
-			if(right_stick_x > -DEADZONE && right_stick_x < DEADZONE) {
+			if((right_stick_x > -DEADZONE && right_stick_x < DEADZONE) && (right_stick_y > -DEADZONE && right_stick_y < DEADZONE)) {
 				right_stick_x = 0;
-				in_deadzone = true;
-			}
-			if(right_stick_y > -DEADZONE && right_stick_y < DEADZONE) {
 				right_stick_y = 0;
 				in_deadzone = true;
 			}
-
 
 			#if 0
 			#define MULTIPLIER 16
@@ -536,6 +532,8 @@ int main(void)
 			if(in_deadzone) {
 				right_stick_x = 0;
 				right_stick_y = 0;
+				left_wheel = 0;
+				right_wheel = 0;
 				// Off all directions
 				gpio_pin_set_dt(&lf_gpio, 0);
 				gpio_pin_set_dt(&lr_gpio, 0);
@@ -603,6 +601,8 @@ int main(void)
 				return 0;
 			}
 
+		} else {
+			LOG_INF("CRSF Frame not ready");
 		}
 
 
