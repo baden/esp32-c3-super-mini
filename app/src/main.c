@@ -22,48 +22,17 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 #include <zephyr/sys/ring_buffer.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/printk.h>
-
-#if defined(CONFIG_DAC)
 #include <zephyr/drivers/dac.h>
-#endif
 
-// const struct gpio_dt_spec lff = GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(directions), foo_gpios, 0);
 
-// #define DIR_SPEC(n) GPIO_DT_SPEC_GET_BY_IDX(DT_NODELABEL(directions), foo_gpios, n)
+// CRSF protocol
+#define CENTER_X 991	// Чомусь мені здається, шо треба 992
+#define CENTER_Y 991	// Чомусь мені здається, шо треба 992
 
-// const struct gpio_dt_spec lff = DIR_SPEC(0);	// Left front forward
-// const struct gpio_dt_spec lfr = DIR_SPEC(1);	// Left front reverse
-// const struct gpio_dt_spec rff = DIR_SPEC(2);	// Right front forward
-// const struct gpio_dt_spec rfr = DIR_SPEC(3);	// Right front reverse
-
-// #include <zephyr/usb/usb_device.h>
-// #include <zephyr/usb/usbd.h>
-// #include <zephyr/drivers/uart.h>
-
-// BUILD_ASSERT(DT_NODE_HAS_COMPAT(DT_CHOSEN(zephyr_console), zephyr_cdc_acm_uart),
-// 	     "Console device is not ACM CDC UART device");
-
-// #if defined(CONFIG_USB_DEVICE_STACK_NEXT)
-// static struct usbd_contex *sample_usbd;
-
-// static int enable_usb_device_next(void)
-// {
-// 	int err;
-
-// 	sample_usbd = sample_usbd_init_device();
-// 	if (sample_usbd == NULL) {
-// 		return -ENODEV;
-// 	}
-
-// 	err = usbd_enable(sample_usbd);
-// 	if (err) {
-// 		return err;
-// 	}
-
-// 	return 0;
-// }
-// #endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK_NEXT) */
-
+#define MAX_X 820		// -820...820
+#define MAX_Y 820		// -820...820
+// Підвищення роздільної здатності задля кращої точності
+#define MULTIPLIER 1
 
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
 
@@ -71,8 +40,6 @@ const struct gpio_dt_spec lf_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, lf_gpios)
 const struct gpio_dt_spec lr_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, lr_gpios);	// Left reverse
 const struct gpio_dt_spec rf_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, rf_gpios);	// Right forward
 const struct gpio_dt_spec rr_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, rr_gpios);	// Right reverse
-
-#if defined(CONFIG_DAC)
 
 #define DAC0_NODE DT_PHANDLE(ZEPHYR_USER_NODE, dac0)
 #define DAC0_CHANNEL_ID DT_PROP(ZEPHYR_USER_NODE, dac0_channel_id)
@@ -96,7 +63,6 @@ static const struct dac_channel_cfg dac1_ch_cfg = {
 	.resolution  = DAC1_RESOLUTION,
 	.buffered = true
 };
-#endif
 
 
 // Адресний світлодіод (в подальшому можливо стрічка)
@@ -117,6 +83,9 @@ struct led_rgb pixels[STRIP_NUM_PIXELS];
 
 static const struct device *const strip = DEVICE_DT_GET(STRIP_NODE);
 
+#if !defined(CONFIG_CRSF)
+#define CONFIG_CRSF	1
+#endif
 
 #if defined(CONFIG_CRSF)
 #define DEV_CRFS   DEVICE_DT_GET(DT_CHOSEN(crsf))
@@ -293,89 +262,64 @@ void serial_cb(const struct device *dev, void *user_data)
 #define abs(x) ((x) < 0 ? -(x) : (x))
 #endif
 
-int main(void)
+int io_init()
 {
-	// const struct device *const dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
-
-	// uint32_t dtr = 0;
-
-// #if defined(CONFIG_USB_DEVICE_STACK_NEXT)
-// 	if (enable_usb_device_next()) {
-// 		return 0;
-// 	}
-// #else
-// 	if (usb_enable(NULL)) {
-// 		return 0;
-// 	}
-// #endif
-
-// 	/* Poll if the DTR flag was set */
-// 	while (!dtr) {
-// 		uart_line_ctrl_get(dev, UART_LINE_CTRL_DTR, &dtr);
-// 		/* Give CPU resources to low priority threads. */
-// 		k_sleep(K_MSEC(100));
-// 	}
-
-// 		printk("Hello World! %s\n", CONFIG_ARCH);
-// 		k_sleep(K_SECONDS(1));
-
-
-	size_t cursor = 0, color = 0;
-	int rc;
 	int ret;
-
 	// Шо за куйня? Нафіга тут таке?
-
 	if(!gpio_is_ready_dt(&lf_gpio)) {
 		LOG_ERR("Left forward GPIO device not found!");
-		return 0;
+		return -1;
 	}
 	ret = gpio_pin_configure_dt(&lf_gpio, GPIO_OUTPUT_INACTIVE);
 	if (ret < 0) {
 		LOG_ERR("Failed to configure left forward GPIO: %d", ret);
-		return 0;
+		return ret;
 	}
 
 	if(!gpio_is_ready_dt(&lr_gpio)) {
 		LOG_ERR("Left reverse GPIO device not found!");
-		return 0;
+		return -1;
 	}
 	ret = gpio_pin_configure_dt(&lr_gpio, GPIO_OUTPUT_INACTIVE);
 	if (ret < 0) {
 		LOG_ERR("Failed to configure left reverse GPIO: %d", ret);
-		return 0;
+		return ret;
 	}
 
 	if(!gpio_is_ready_dt(&rf_gpio)) {
 		LOG_ERR("Right forward GPIO device not found!");
-		return 0;
+		return -1;
 	}
 	ret = gpio_pin_configure_dt(&rf_gpio, GPIO_OUTPUT_INACTIVE);
 	if (ret < 0) {
 		LOG_ERR("Failed to configure right forward GPIO: %d", ret);
-		return 0;
+		return ret;
 	}
 
 	if(!gpio_is_ready_dt(&rr_gpio)) {
 		LOG_ERR("Right reverse GPIO device not found!");
-		return 0;
+		return -1;
 	}
 	ret = gpio_pin_configure_dt(&rr_gpio, GPIO_OUTPUT_INACTIVE);
 	if (ret < 0) {
 		LOG_ERR("Failed to configure right reverse GPIO: %d", ret);
-		return 0;
+		return ret;
 	}
+	return 0;
+}
 
-
-
-	if (device_is_ready(strip)) {
-		LOG_INF("Found LED strip device %s", strip->name);
-	} else {
+int led_init()
+{
+	if(!device_is_ready(strip)) {
 		LOG_ERR("LED strip device %s is not ready", strip->name);
-		return 0;
+		return -1;
 	}
+	return 0;
+}
 
-
+int crsf_init()
+{
+	int ret;
 	#if defined(CONFIG_CRSF)
 	if (!device_is_ready(crsf_dev)) {
 		LOG_ERR("CRSF UART device not found!");
@@ -414,15 +358,12 @@ int main(void)
 	// 	k_sleep(K_MSEC(100));
 	// }
 	#endif
+	return 0;
+}
 
-	// for(;;) {
-	// 	printk("Hello World! %s\n", CONFIG_ARCH);
-	// 	k_sleep(K_SECONDS(10));
-	// }
-
-
-	#if defined(CONFIG_DAC)
-
+int dac_init()
+{
+	int ret;
 	if (!device_is_ready(dac0_dev)) {
 		printk("DAC0 device %s is not ready\n", dac0_dev->name);
 		return 0;
@@ -432,7 +373,6 @@ int main(void)
 		printk("Setting up of DAC0 channel failed with code %d\n", ret);
 		return 0;
 	}
-	unsigned int dac0_value = 0;
 
 	if (!device_is_ready(dac1_dev)) {
 		printk("DAC1 device %s is not ready\n", dac1_dev->name);
@@ -443,202 +383,237 @@ int main(void)
 		printk("Setting up of DAC1 channel failed with code %d\n", ret);
 		return 0;
 	}
-	unsigned int dac1_value = 0;
+	return 0;
+}
+
+int led_update()
+{
+	static size_t cursor = 0, color = 0;
+	int rc;
+
+	memset(&pixels, 0x00, sizeof(pixels));
+	memcpy(&pixels[cursor], &colors[color], sizeof(struct led_rgb));
+	rc = led_strip_update_rgb(strip, pixels, STRIP_NUM_PIXELS);
+
+	if (rc) {
+		LOG_ERR("couldn't update strip: %d", rc);
+	}
+
+	cursor++;
+	if (cursor >= STRIP_NUM_PIXELS) {
+		cursor = 0;
+		color++;
+		if (color == ARRAY_SIZE(colors)) {
+			color = 0;
+		}
+	}
+	return 0;
+}
+
+int dac_update(int left_wheel, int right_wheel)
+{
+	int ret;
+
+	unsigned int dac0_value = abs(left_wheel) * 4094 / MAX_X / MULTIPLIER;
+
+	if(dac0_value > 4094) {
+		dac0_value = 4094;
+	} else if(dac0_value < 0) {
+		dac0_value = 0;
+	}
+
+	// Invert voltage
+	dac0_value = 4094 - dac0_value;
+
+	unsigned int dac1_value = abs(right_wheel) * 4094 / MAX_Y / MULTIPLIER;
+
+	if(dac1_value > 4094) {
+		dac1_value = 4094;
+	} else if(dac1_value < 0) {
+		dac1_value = 0;
+	}
+
+	// Invert voltage
+	dac1_value = 4094 - dac1_value;
+
+	// LOG_INF(
+	// 	"L: %s:%d "
+	// 	"R: %s:%d "
+	// 	"DAC0: %d "
+	// 	"DAC1: %d",
+	// 	left_wheel_dir ? "^" : "v", left_wheel,
+	// 	right_wheel_dir ? "^" : "v", right_wheel,
+	// 	dac0_value,
+	// 	dac1_value
+	// );
+
+
+	ret = dac_write_value(dac0_dev, DAC0_CHANNEL_ID, dac0_value);
+	if (ret != 0) {
+		LOG_ERR("dac0_write_value() failed with code %d\n", ret);
+		return ret;
+	}
+
+	ret = dac_write_value(dac1_dev, DAC1_CHANNEL_ID, dac1_value);
+	if (ret != 0) {
+		printk("dac1_write_value() failed with code %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+// Автопилот:
+// 7й канал - вмикання (1792)/вимикання(191) автопілота 
+// 6й канал - обмеження швидкості автопілота (192-повільно, 992-середньо, 1792-швидко)
+// 10й канал - лівий двигун (191...1792)
+// 11й канал - правий двигун (191...1792)
+
+
+int crsf_update(int *left_wheel, int *right_wheel)
+{
+	// LOG_INF(
+	// 	"0:%5d 1:%5d 2:%5d 3:%5d 4:%5d 5:%5d 6: %5d 7:%5d "
+	// 	"8:%5d 9:%5d 10:%5d 11:%5d 12:%5d 13:%5d 14:%5d 15:%5d",
+	// 	channel[0], channel[1], channel[2], channel[3], channel[4], channel[5], channel[6], channel[7],
+	// 	channel[8], channel[9], channel[10], channel[11], channel[12], channel[13], channel[14], channel[15]
+	// );
+
+	if(channel[7] > 1000) {
+		int speed = channel[6];
+		int left_w = channel[10] - 191;
+		int right_w = channel[11] - 191;
+		// Швидкість
+		int max_speed = 820;
+		if(speed < 592) {
+			max_speed = 820/3;
+		} else if(speed < 1392) {
+			max_speed = 820/2;
+		}
+
+		// Автопілот ввімкнено
+		// Лівий двигун
+		*left_wheel = left_w * max_speed / 1600;
+		// Правий двигун
+		*right_wheel = right_w * max_speed / 1600;
+		return 0;
+	}
+	// 
+	// int left_stick_x = channel[3];
+	// int left_stick_y = channel[2];
+	int right_stick_x = channel[0];
+	int right_stick_y = channel[1];
+
+
+	// Translate from 174...1811 to -820...820 (centered at 991)
+	right_stick_x -= CENTER_X;
+	right_stick_y -= CENTER_Y;
+
+	#define DEADZONE 10
+	bool in_deadzone = false;
+	if((right_stick_x > -DEADZONE && right_stick_x < DEADZONE) && (right_stick_y > -DEADZONE && right_stick_y < DEADZONE)) {
+		right_stick_x = 0;
+		right_stick_y = 0;
+		in_deadzone = true;
+	}
+
+	#if 0
+	#define MULTIPLIER 16
+
+	// Multiply by MULTIPLIER for better resolution
+	right_stick_x *= MULTIPLIER;
+	right_stick_y *= MULTIPLIER;
+
+	// Rotate right_stick_x, right_stick_y 45 degrees counterclockwise
+	int temp = right_stick_x;
+	right_stick_x = (int)(0.70710678118 * right_stick_x - 0.70710678118 * right_stick_y);
+	right_stick_y = (int)(0.70710678118 * right_stick_y + 0.70710678118 * temp);
+
+	// int left_wheel = right_stick_y + right_stick_x;
+	// int right_wheel = right_stick_y - right_stick_x;
+
+	int left_wheel = abs(right_stick_y);
+	int right_wheel = abs(right_stick_x);
+	bool left_wheel_dir = right_stick_y > 0;
+	bool right_wheel_dir = right_stick_x > 0;
 	#endif
 
-	LOG_INF("Displaying pattern on strip");
+	// Проста поведінка - прцює тільки частина діапазону
+	*left_wheel = right_stick_x + right_stick_y;
+	*right_wheel = right_stick_y - right_stick_x;
+	return 0;
+}
+
+static bool in_deadzone(int left_wheel, int right_wheel)
+{
+	return (left_wheel > -DEADZONE && left_wheel < DEADZONE) && (right_wheel > -DEADZONE && right_wheel < DEADZONE);
+}
+
+int set_dirs(int left_wheel, int right_wheel)
+{
+	bool left_wheel_dir = left_wheel > 0;
+	bool right_wheel_dir = right_wheel > 0;
+
+	if(in_deadzone(left_wheel, right_wheel)) {
+		// Off all directions
+		gpio_pin_set_dt(&lf_gpio, 0);
+		gpio_pin_set_dt(&lr_gpio, 0);
+		gpio_pin_set_dt(&rf_gpio, 0);
+		gpio_pin_set_dt(&rr_gpio, 0);
+	} else {
+		if(left_wheel_dir) {
+			gpio_pin_set_dt(&lr_gpio, 0);
+			gpio_pin_set_dt(&lf_gpio, 1);
+		} else {
+			gpio_pin_set_dt(&lf_gpio, 0);
+			gpio_pin_set_dt(&lr_gpio, 1);
+		}
+		if(right_wheel_dir) {
+			gpio_pin_set_dt(&rr_gpio, 0);
+			gpio_pin_set_dt(&rf_gpio, 1);
+		} else {
+			gpio_pin_set_dt(&rf_gpio, 0);
+			gpio_pin_set_dt(&rr_gpio, 1);
+		}
+	}
+	return 0;
+}
+
+int main(void)
+{
+	int left_wheel = 0;
+	int right_wheel = 0;
+	int new_left_wheel = 0;	// Updated values from CRSF or (0,0) if no new values
+	int new_right_wheel = 0;
+
+	if(io_init() < 0) return -1;
+	if(led_init() < 0) return -1;
+	if(crsf_init() < 0) return -1;
+	if(dac_init() < 0) return -1;
+
 	while (1) {
-		memset(&pixels, 0x00, sizeof(pixels));
-		memcpy(&pixels[cursor], &colors[color], sizeof(struct led_rgb));
-		rc = led_strip_update_rgb(strip, pixels, STRIP_NUM_PIXELS);
-
-		if (rc) {
-			LOG_ERR("couldn't update strip: %d", rc);
-		}
-
-		cursor++;
-		if (cursor >= STRIP_NUM_PIXELS) {
-			cursor = 0;
-			color++;
-			if (color == ARRAY_SIZE(colors)) {
-				color = 0;
-			}
-		}
-
-		#if defined(CONFIG_DAC)
+		led_update();
 
 		if(crsf_frame_ready) {
 			crsf_frame_ready = false;
-			// LOG_INF(
-			// 	"0:%5d 1:%5d 2:%5d 3:%5d 4:%5d 5:%5d 6: %5d 7:%5d"
-			// 	"8:%5d 9:%5d 10:%5d 11:%5d 12:%5d 13:%5d 14:%5d 15:%5d",
-			// 	channel[0], channel[1], channel[2], channel[3], channel[4], channel[5], channel[6], channel[7],
-			// 	channel[8], channel[9], channel[10], channel[11], channel[12], channel[13], channel[14], channel[15]
-			// );
-			// 
-			// int left_stick_x = channel[3];
-			// int left_stick_y = channel[2];
-			int right_stick_x = channel[0];
-			int right_stick_y = channel[1];
-
-			#define CENTER_X 991	// Чомусь мені здається, шо треба 992
-			#define CENTER_Y 991	// Чомусь мені здається, шо треба 992
-
-			#define MAX_X 820		// -820...820
-			#define MAX_Y 820		// -820...820
-
-			// Translate from 174...1811 to -820...820 (centered at 991)
-			right_stick_x -= CENTER_X;
-			right_stick_y -= CENTER_Y;
-
-			#define DEADZONE 10
-			bool in_deadzone = false;
-			if((right_stick_x > -DEADZONE && right_stick_x < DEADZONE) && (right_stick_y > -DEADZONE && right_stick_y < DEADZONE)) {
-				right_stick_x = 0;
-				right_stick_y = 0;
-				in_deadzone = true;
-			}
-
-			#if 0
-			#define MULTIPLIER 16
-
-			// Multiply by MULTIPLIER for better resolution
-			right_stick_x *= MULTIPLIER;
-			right_stick_y *= MULTIPLIER;
-
-			// Rotate right_stick_x, right_stick_y 45 degrees counterclockwise
-			int temp = right_stick_x;
-			right_stick_x = (int)(0.70710678118 * right_stick_x - 0.70710678118 * right_stick_y);
-			right_stick_y = (int)(0.70710678118 * right_stick_y + 0.70710678118 * temp);
-
-			// int left_wheel = right_stick_y + right_stick_x;
-			// int right_wheel = right_stick_y - right_stick_x;
-
-			int left_wheel = abs(right_stick_y);
-			int right_wheel = abs(right_stick_x);
-			bool left_wheel_dir = right_stick_y > 0;
-			bool right_wheel_dir = right_stick_x > 0;
-			#endif
-
-			// Проста поведінка - прцює тільки частина діапазону
-			#define MULTIPLIER 1
-			int left_wheel = right_stick_x + right_stick_y;
-			int right_wheel = right_stick_y - right_stick_x;
-			bool left_wheel_dir = left_wheel > 0;
-			bool right_wheel_dir = right_wheel > 0;
-			left_wheel = abs(left_wheel);
-			right_wheel = abs(right_wheel);
-
-			if(in_deadzone) {
-				right_stick_x = 0;
-				right_stick_y = 0;
-				left_wheel = 0;
-				right_wheel = 0;
-				// Off all directions
-				gpio_pin_set_dt(&lf_gpio, 0);
-				gpio_pin_set_dt(&lr_gpio, 0);
-				gpio_pin_set_dt(&rf_gpio, 0);
-				gpio_pin_set_dt(&rr_gpio, 0);
-			} else {
-				if(left_wheel_dir) {
-					gpio_pin_set_dt(&lr_gpio, 0);
-					gpio_pin_set_dt(&lf_gpio, 1);
-				} else {
-					gpio_pin_set_dt(&lf_gpio, 0);
-					gpio_pin_set_dt(&lr_gpio, 1);
-				}
-				if(right_wheel_dir) {
-					gpio_pin_set_dt(&rr_gpio, 0);
-					gpio_pin_set_dt(&rf_gpio, 1);
-				} else {
-					gpio_pin_set_dt(&rf_gpio, 0);
-					gpio_pin_set_dt(&rr_gpio, 1);
-				}
-			}
-
-			dac0_value = left_wheel * 4094 / MAX_X / MULTIPLIER;
-			dac1_value = right_wheel * 4094 / MAX_Y / MULTIPLIER;
-
-			if(dac0_value > 4094) {
-				dac0_value = 4094;
-			} else if(dac0_value < 0) {
-				dac0_value = 0;
-			}
-
-			// Invert voltage
-			dac0_value = 4094 - dac0_value;
-
-			if(dac1_value > 4094) {
-				dac1_value = 4094;
-			} else if(dac1_value < 0) {
-				dac1_value = 0;
-			}
-
-			// Invert voltage
-			dac1_value = 4094 - dac1_value;
-
-			LOG_INF(
-				"L: %s:%d "
-				"R: %s:%d "
-				"DAC0: %d "
-				"DAC1: %d",
-				left_wheel_dir ? "^" : "v", left_wheel,
-				right_wheel_dir ? "^" : "v", right_wheel,
-				dac0_value,
-				dac1_value
-			);
-
-			ret = dac_write_value(dac0_dev, DAC0_CHANNEL_ID, dac0_value);
-			if (ret != 0) {
-				printk("dac0_write_value() failed with code %d\n", ret);
-				return 0;
-			}
-
-
-			ret = dac_write_value(dac1_dev, DAC1_CHANNEL_ID, dac1_value);
-			if (ret != 0) {
-				printk("dac1_write_value() failed with code %d\n", ret);
-				return 0;
-			}
-
+			crsf_update(&new_left_wheel, &new_right_wheel);
 		} else {
-			LOG_INF("CRSF Frame not ready");
+			// LOG_INF("CRSF Frame not ready");
+			new_left_wheel = 0;
+			new_right_wheel = 0;
 		}
 
+		// Low-pass filter
+		left_wheel = (left_wheel + new_left_wheel) / 2;
+		right_wheel = (right_wheel + new_right_wheel) / 2;
 
-		// /* Number of valid DAC values, e.g. 4096 for 12-bit DAC */
-		// const int dac0_values = 1U << DAC0_RESOLUTION;
-		// const int dac1_values = 1U << DAC1_RESOLUTION;
+		// LOG_INF("L: %5d R: %5d ", left_wheel, right_wheel);
 
-		// ret = dac_write_value(dac0_dev, DAC0_CHANNEL_ID, dac0_value);
-		// if (ret != 0) {
-		// 	printk("dac0_write_value() failed with code %d\n", ret);
-		// 	return 0;
-		// }
-		// dac0_value = (dac0_value + 1) % dac0_values;
+		set_dirs(left_wheel, right_wheel);
 
-		// ret = dac_write_value(dac1_dev, DAC1_CHANNEL_ID, dac1_value);
-		// if (ret != 0) {
-		// 	printk("dac1_write_value() failed with code %d\n", ret);
-		// 	return 0;
-		// }
-		// dac1_value = (dac1_value + 1) % dac1_values;
-
-		#endif
+		dac_update(left_wheel, right_wheel);
 
 		k_sleep(DELAY_TIME);
 	}
 	return 0;
 }
-
-// #include <zephyr/kernel.h>
-
-// int main(void)
-// {
-//     int count = 0;
-//     for(;;) {
-//         printk("Hello World %d! %s\n", count++, CONFIG_BOARD);
-//         k_sleep(K_MSEC(1000));
-//     }
-//     return 0;
-// }
